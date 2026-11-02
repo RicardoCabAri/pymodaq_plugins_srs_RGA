@@ -9,5 +9,10 @@ try:
 except PackageNotFoundError:
     __version__ = '0.0.0dev'
 
+from serial.tools.list_ports import comports
+COM_ports = [comport.device for comport in comports()]
+COM_ports.insert(0, '/dev/srs_rga100')  # This is compatible as long as the serial to USB adapter is not changed
+config["com_ports"] = COM_ports
 
+config.save()
 
