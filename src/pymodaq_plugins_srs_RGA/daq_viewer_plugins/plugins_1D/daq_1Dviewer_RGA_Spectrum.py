@@ -8,6 +8,8 @@ from pymodaq.control_modules.viewer_utility_classes import DAQ_Viewer_base, como
 from pymodaq.utils.data import DataFromPlugins
 
 from pymodaq_plugins_srs_RGA.hardware.wrapper import RGAWrapper
+from pymodaq_plugins_srs.utils import Config
+config = Config()
 
 class DAQ_1DViewer_RGA_Spectrum(DAQ_Viewer_base):
     """ Instrument plugin class for a 1D viewer.
@@ -32,8 +34,9 @@ class DAQ_1DViewer_RGA_Spectrum(DAQ_Viewer_base):
 
     """
     params = comon_parameters + [
-        {'title': 'COM:', 'name': 'com_port', 'type': 'list',
-         'limits': RGAWrapper.get_available_ports()},
+        # {'title': 'COM:', 'name': 'com_port', 'type': 'list',
+        #  'limits': RGAWrapper.get_available_ports()},
+        {'title': 'COM', 'name':  'com_port', 'type': 'list', 'limits': config['com_ports'], 'value':config['com_ports'][0]}, #Most suitable for pymodaq
         {'title': 'Filament (emission current, mA):', 'name': 'filament', 'type': 'float', 'value': 0,
          'default': 0, 'min': 0, 'max': 3.5},
         {'title': 'CEM voltage (V):', 'name': 'cem', 'type': 'int', 'value': 0,
