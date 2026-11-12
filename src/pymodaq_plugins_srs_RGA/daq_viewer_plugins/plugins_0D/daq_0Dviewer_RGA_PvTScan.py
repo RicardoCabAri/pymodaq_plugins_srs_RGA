@@ -161,6 +161,15 @@ class DAQ_0DViewer_RGA_PvTScan(DAQ_Viewer_base):
         if not initialized:
             return 'RGA not connected', False
 
+        # Potential solution 
+        try:
+            self.controller.scan.speed = int(self.settings.child('scan_speed').value())
+            self.controller.ionizer.emission_current = float(self.settings.child('filament').value())
+            self.controller.cem.voltage = int(self.settings.child('cem').value())
+        except Exception as e:
+            self.emit_status(ThreadCommand('Update_Status', [f'Init settings error: {e}', 'log']))
+        #------------------------------------------
+        
         self.masses_to_measure = self.get_masses_to_measure()
         names = [f'{m} amu' for m in self.masses_to_measure]
         self.dte_signal_temp.emit(DataToExport(
@@ -206,6 +215,14 @@ class DAQ_0DViewer_RGA_PvTScan(DAQ_Viewer_base):
             self.emit_status(ThreadCommand('Update_Status', [f'Scan error: {type(e).__name__}: {e}', 'log']))
             return
 
+        # Emit status to check if it is working properly 
+        cem_v = self.controller.cem.voltage
+        gain = self.controller.cem.stored_gain
+        self.emit_status(ThreadCommand('Update_Status',
+            [f'factor={factor:.3e}, CEM={cem_v} V, stored_gain={gain}', 'log']))
+        #----------------------------------------------
+
+        
         self.dte_signal.emit(DataToExport(
             name='PvT Scan RGA',
             data=[DataFromPlugins(name=unit,

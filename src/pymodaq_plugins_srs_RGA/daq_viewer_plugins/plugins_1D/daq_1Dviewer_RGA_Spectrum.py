@@ -53,6 +53,11 @@ class DAQ_1DViewer_RGA_Spectrum(DAQ_Viewer_base):
          'default': 10, 'min': 10, 'max': 80},
         {'title': 'Units:', 'name': 'units', 'type': 'list',
          'value': 'fA', 'limits': ['fA', 'torr']},
+        {'title': 'Display:', 'name': 'display', 'type': 'list', 'value': 'Spectrum',
+         'limits': ['Spectrum', 'Bars']},
+        {'title': 'Stack scans:', 'name': 'stack', 'type': 'bool', 'value': False},
+        {'title': 'Max stacked scans:', 'name': 'n_stack', 'type': 'int', 'value': 5, 'min': 1, 'max': 50},
+        {'title': 'Clear stack:', 'name': 'clear_stack', 'type': 'bool_push', 'label': 'Clear', 'value': False},
     ]
 
     HISTOGRAM_STEPS_PER_AMU = 10  # srsinst default; irrelevant for histogram scans (1 point/amu)
@@ -63,6 +68,8 @@ class DAQ_1DViewer_RGA_Spectrum(DAQ_Viewer_base):
         self.controller: RGAWrapper = None
         self.x_axis: Axis = None
         self._filament_warned = False
+        self._history = []
+        self._hist_key = None
 
     def _status(self, msg):
         self.emit_status(ThreadCommand('Update_Status', [msg, 'log']))
@@ -104,6 +111,15 @@ class DAQ_1DViewer_RGA_Spectrum(DAQ_Viewer_base):
         else:
             self._filament_warned = False
 
+    @staticmethod
+    def _to_bars(mass, y, width=0.8):
+        """Convert histogram points into a staircase so the curve looks like bars."""
+        mass = np.asarray(mass, dtype=float)
+        y = np.asarray(y, dtype=float)
+        h = width / 2.0
+        x = np.repeat(mass, 4) + np.tile([-h, -h, h, h], len(mass))
+        yy = np.column_stack([np.zeros_like(y), y, y, np.zeros_like(y)]).ravel()
+        return x, yy
     # ------------------------------------------------------------------ 
 
     def commit_settings(self, param: Parameter):
@@ -128,6 +144,9 @@ class DAQ_1DViewer_RGA_Spectrum(DAQ_Viewer_base):
                 self._check_set_status(self.controller.cem, 'CEM voltage')
         except Exception as e:
             self._status(f'Could not apply "{name}": {e}')
+        if name == 'clear_stack':
+            self._history = []
+            return
 
 
     def ini_detector(self, controller=None):
@@ -240,12 +259,30 @@ class DAQ_1DViewer_RGA_Spectrum(DAQ_Viewer_base):
             self._status(f'Scan error: {type(e).__name__}: {e}')
             return
 
-        self.x_axis = self._make_axis(mass_axis)
-        label = f'{scan_type} ({unit})'
+        x = np.asarray(mass_axis, dtype=float)
+        y_plot = y
+        if self.settings.child('display').value() == 'Bars':
+            x, y_plot = self._to_bars(mass_axis, y)
+
+        # reset the stack if the scan geometry changed (all channels must share the same axis)
+        key = (scan_type, unit, start, stop, res, len(y_plot))
+        if key != self._hist_key:
+            self._history = []
+            self._hist_key = key
+
+        if self.settings.child('stack').value():
+            self._history.append(y_plot)
+            self._history = self._history[-int(self.settings.child('n_stack').value()):]
+        else:
+            self._history = [y_plot]
+
+        self.x_axis = self._make_axis(x)
+        n = len(self._history)
+        labels = [f'{scan_type} ({unit}) #{i + 1}' for i in range(n)]
         self.dte_signal.emit(DataToExport(
             name='RGA spectrum',
-            data=[DataFromPlugins(name=f'{scan_type} scan', data=[y], dim='Data1D',
-                                  labels=[label], axes=[self.x_axis])]))
+            data=[DataFromPlugins(name=f'{scan_type} scans', data=list(self._history),
+                                dim='Data1D', labels=labels, axes=[self.x_axis])]))
 
 
     def stop(self):
