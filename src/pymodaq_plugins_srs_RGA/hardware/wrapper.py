@@ -1,6 +1,5 @@
 from srsinst.rga import RGA100
 from serial.tools.list_ports import comports
-
 import platform
 
 os_name = platform.system()
@@ -29,7 +28,6 @@ class RGAWrapper(RGA100):
 
 # R = RGAWrapper("/dev/ttyUSB0")
 # R = RGAWrapper("/dev/srs_rga100")
-
 # R.disconnect()
 
     def get_conversion_factor(self, unit):
